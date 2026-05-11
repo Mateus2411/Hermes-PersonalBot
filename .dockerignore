@@ -1,0 +1,9 @@
+# Render-specific: only what's needed for the Dockerfile
+.git/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+README.md
+test_health.py
+render.yaml

@@ -1,0 +1,90 @@
+# ── Model ────────────────────────────────────────────────────
+model:
+  default: big-pickle
+  provider: opencode-zen
+  base_url: https://opencode.ai/zen/v1
+  api_mode: chat_completions
+
+# ── No fallback providers (router removido) ──────────────────
+fallback_providers: []
+credential_pool_strategies: {}
+
+# ── Agent ──────────────────────────────────────────────────
+agent:
+  max_turns: 100
+  gateway_timeout: 1800
+  api_max_retries: 3
+  reasoning_effort: medium
+  tool_use_enforcement: auto
+  image_input_mode: auto
+
+# ── Terminal ────────────────────────────────────────────────
+terminal:
+  backend: local
+  timeout: 180
+  container_persistent: true
+
+# ── Context Compression ────────────────────────────────────
+compression:
+  enabled: true
+  threshold: 0.5
+  target_ratio: 0.2
+  protect_last_n: 20
+
+# ── Auxiliary (sem OpenRouter — vai tentar auto com opencode-zen) ──
+auxiliary:
+  vision:
+    provider: opencode-zen
+    model: big-pickle
+    base_url: https://opencode.ai/zen/v1
+  web_extract:
+    provider: opencode-zen
+    model: big-pickle
+    base_url: https://opencode.ai/zen/v1
+  compression:
+    provider: opencode-zen
+    model: big-pickle
+    base_url: https://opencode.ai/zen/v1
+  session_search:
+    provider: opencode-zen
+    model: big-pickle
+    base_url: https://opencode.ai/zen/v1
+  approval:
+    provider: opencode-zen
+    model: big-pickle
+    base_url: https://opencode.ai/zen/v1
+
+# ── Display ─────────────────────────────────────────────────
+display:
+  personality: kawaii
+  streaming: true
+  show_reasoning: false
+  skin: default
+
+# ── Memory ──────────────────────────────────────────────────
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+
+# ── Security ────────────────────────────────────────────────
+security:
+  redact_secrets: true
+  tirith_enabled: true
+
+# ── Telegram ────────────────────────────────────────────────
+telegram:
+  reactions: false
+  allowed_chats: '8599666899'
+
+# ── MCP Servers ─────────────────────────────────────────────
+mcp_servers: {}
+
+# ── Logging ─────────────────────────────────────────────────
+logging:
+  level: INFO
+  max_size_mb: 5
+  backup_count: 3
+
+# ── Openrouter desabilitado ─────────────────────────────────
+openrouter:
+  response_cache: false

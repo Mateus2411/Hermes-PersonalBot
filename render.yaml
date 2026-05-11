@@ -1,0 +1,61 @@
+# Render Blueprint — deploy hermes-agent com health check 24/7
+#
+# 1. Faça upload desses arquivos num repositório GitHub
+# 2. No Render Dashboard: New → Blueprint → conecte o repo
+# 3. Configure os env vars (TELEGRAM_BOT_TOKEN, etc.)
+# 4. Adicione um Persistent Disk em /opt/data
+# 5. Deploy!
+#
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: hermes-agent
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    plan: free
+
+    # ── Health check ──
+    # Render pings isso. O health server também responde em / e /health.
+    healthCheckPath: /
+    healthCheckPort: 10000
+
+    # ── Persistent disk (obrigatório pra auth/sessions) ──
+    disk:
+      name: hermes-data
+      mountPath: /opt/data
+      sizeGB: 1
+
+    # ── Portas expostas ──
+    ports:
+      - port: 10000  # Health server
+      - port: 9119   # Dashboard (opcional)
+
+    # ── Env vars (COLOQUE AQUI, mas use Secret Files pra tokens) ──
+    envVars:
+      - key: HERMES_HOME
+        value: /opt/data
+      - key: HERMES_DASHBOARD
+        value: "1"
+      - key: HERMES_DASHBOARD_HOST
+        value: 0.0.0.0
+      - key: HERMES_DASHBOARD_PORT
+        value: "9119"
+      - key: HEALTH_PORT
+        value: "10000"
+
+      # ── Modelo (OpenCode Zen apenas — router removido) ──
+      - key: OPENCODE_ZEN_API_KEY
+        sync: false
+      # OPENROUTER_API_KEY foi removido — só opencode-zen ativo
+
+      # ── Telegram ──
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALLOWED_USERS
+        value: "8599666899"
+      - key: TELEGRAM_WEBHOOK_URL
+        sync: false  # https://seu-app.onrender.com
+
+      # WhatsApp removido — só Telegram ativo
