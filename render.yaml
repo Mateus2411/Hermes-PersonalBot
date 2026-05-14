@@ -50,6 +50,12 @@ services:
         sync: false
       # OPENROUTER_API_KEY foi removido — só opencode-zen ativo
 
+      # ── MCP Server Tokens ──
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: COMPOSIO_API_KEY
+        sync: false
+
       # ── Telegram ──
       - key: TELEGRAM_BOT_TOKEN
         sync: false

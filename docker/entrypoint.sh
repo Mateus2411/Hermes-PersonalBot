@@ -50,6 +50,18 @@ fi
 if [ -f "$INSTALL_DIR/render-config.yaml" ]; then
     cp "$INSTALL_DIR/render-config.yaml" "$HERMES_HOME/config.yaml"
     echo "[config] Applied render-config.yaml (opencode-zen only, no router)"
+
+    # Expand env vars (${VAR}) in the config — suporta GITHUB_TOKEN, COMPOSIO_API_KEY etc.
+    python3 -c "
+import os
+path = '$HERMES_HOME/config.yaml'
+with open(path) as f:
+    content = f.read()
+content = os.path.expandvars(content)
+with open(path, 'w') as f:
+    f.write(content)
+" 2>/dev/null || true
+    echo "[config] Environment variables expanded"
 fi
 if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
     cp "$INSTALL_DIR/docker/SOUL.md" "$HERMES_HOME/SOUL.md"

@@ -26,13 +26,23 @@ USER root
 COPY render-health.py /opt/hermes/render-health.py
 RUN chmod +x /opt/hermes/render-health.py
 
-# Custom config.yaml — sets opencode-zen as sole provider (no router)
+# Custom config.yaml — sets opencode-zen + kwai-bb + toolsets + MCPs
 COPY config.yaml /opt/hermes/render-config.yaml
 RUN chmod 644 /opt/hermes/render-config.yaml
+
+# Skills — mente compartilhada com o CLI
+COPY skills /opt/hermes/skills/
+RUN find /opt/hermes/skills/ -type d -exec chmod 755 {} + && \
+    find /opt/hermes/skills/ -type f -exec chmod 644 {} +
 
 # Replace the entrypoint with our multi-process version
 COPY docker/entrypoint.sh /opt/hermes/docker/entrypoint.sh
 RUN chmod +x /opt/hermes/docker/entrypoint.sh
+
+# Install Node.js for npx-based MCP servers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs npm ca-certificates && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Health server port
 EXPOSE 10000
