@@ -63,6 +63,61 @@ with open(path, 'w') as f:
 " 2>/dev/null || true
     echo "[config] Environment variables expanded"
 fi
+# ─── Clean up MCP servers that reference local-only paths ──────────────
+# Remove MCP servers that won't work in the container (local paths,
+# missing executables). Keep npx-based servers (Node.js is now installed).
+python3 -c "
+import yaml, os, re
+path = '$HERMES_HOME/config.yaml'
+with open(path) as f:
+    cfg = yaml.safe_load(f)
+mcp = cfg.get('mcp_servers', {})
+if not mcp:
+    exit(0)
+
+# Local-only patterns to detect
+local_paths = ['/mnt/', '/home/', '/Users/']
+changed = False
+
+# Servers to remove: those with args referencing local-only paths,
+# or commands that don't exist in the container
+servers_to_remove = []
+for name, svc in mcp.items():
+    if not isinstance(svc, dict):
+        continue
+    args = svc.get('args', [])
+    # Check for local paths in args
+    args_str = ' '.join(str(a) for a in args)
+    if any(p in args_str for p in local_paths):
+        print(f'[mcp] Removing \"{name}\" — references local path: {args_str[:60]}')
+        servers_to_remove.append(name)
+        changed = True
+
+# Servers with URL that need env var
+composio_key = os.environ.get('COMPOSIO_API_KEY', '')
+for name, svc in mcp.items():
+    if not isinstance(svc, dict):
+        continue
+    url = svc.get('url', '')
+    # Composio: update API key if env var is provided
+    if 'composio' in url and 'x-consumer-api-key' in svc.get('headers', {}):
+        headers = svc['headers']
+        old_key = headers.get('x-consumer-api-key', '')
+        if composio_key:
+            headers['x-consumer-api-key'] = composio_key
+            print(f'[mcp] Updated composio API key from env')
+            changed = True
+
+for name in servers_to_remove:
+    del mcp[name]
+
+if changed:
+    cfg['mcp_servers'] = mcp or {}
+    with open(path, 'w') as f:
+        yaml.dump(cfg, f, default_flow_style=False)
+    print('[mcp] MCP config cleaned up')
+" 2>/dev/null || true
+
 if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
     cp "$INSTALL_DIR/docker/SOUL.md" "$HERMES_HOME/SOUL.md"
 fi

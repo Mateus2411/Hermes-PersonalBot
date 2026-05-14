@@ -22,6 +22,17 @@ FROM nousresearch/hermes-agent:latest
 
 USER root
 
+# ─── Telegram dependency ──────────────────────────────────────────────
+# python-telegram-bot é necessário para o gateway do Telegram funcionar.
+RUN pip install python-telegram-bot
+
+# ─── Node.js 20 para MCP servers baseados em npx ──────────────────────
+# youtube-transcript, context7, github, rippr-mcp e outros MCPServers
+# do ecossistema MCP usam npx. Sem Node.js, eles falham com CancelledError.
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy the health server
 COPY render-health.py /opt/hermes/render-health.py
 RUN chmod +x /opt/hermes/render-health.py
