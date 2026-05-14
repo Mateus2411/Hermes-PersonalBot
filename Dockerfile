@@ -2,15 +2,15 @@
 #
 # Builds on top of the official Hermes Agent image, adding:
 #   - render-health.py  (simple HTTP server returning "ok" + uptime)
-#   - start.sh          (runs health server + gateway together)
+#   - entrypoint.sh     (runs health server + gateway together)
 #
 # Why this works on Render Free tier:
 #   Render spins down after 15 min of inactivity.  Our health endpoint
 #   gets pinged every 5 min by Google Apps Script → Render stays awake
-#   → Telegram stay connected 24/7.
+#   → Telegram stays connected 24/7.
 #
 # Build from repo root:
-#   docker build -t hermes-render -f Dockerfile.render .
+#   docker build -t hermes-render .
 #
 # Run locally to test:
 #   docker run -p 10000:10000 -p 9119:9119 \
@@ -24,20 +24,14 @@ USER root
 
 # ─── Telegram dependency ──────────────────────────────────────────────
 # python-telegram-bot é necessário para o gateway do Telegram funcionar.
-RUN pip install python-telegram-bot
-
-# ─── Node.js 20 para MCP servers baseados em npx ──────────────────────
-# youtube-transcript, context7, github, rippr-mcp e outros MCPServers
-# do ecossistema MCP usam npx. Sem Node.js, eles falham com CancelledError.
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+# O Hermes instala num venv em /opt/hermes/.venv/ — por isso o path completo.
+RUN /opt/hermes/.venv/bin/pip install python-telegram-bot
 
 # Copy the health server
 COPY render-health.py /opt/hermes/render-health.py
 RUN chmod +x /opt/hermes/render-health.py
 
-# Custom config.yaml — sets opencode-zen + kwai-bb + toolsets + MCPs
+# Custom config.yaml — Render-optimized (opencode-zen + kwai-bb + toolsets + MCPs)
 COPY config.yaml /opt/hermes/render-config.yaml
 RUN chmod 644 /opt/hermes/render-config.yaml
 
@@ -49,11 +43,6 @@ RUN find /opt/hermes/skills/ -type d -exec chmod 755 {} + && \
 # Replace the entrypoint with our multi-process version
 COPY docker/entrypoint.sh /opt/hermes/docker/entrypoint.sh
 RUN chmod +x /opt/hermes/docker/entrypoint.sh
-
-# Install Node.js for npx-based MCP servers
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nodejs npm ca-certificates && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Health server port
 EXPOSE 10000
