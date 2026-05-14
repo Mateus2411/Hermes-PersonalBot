@@ -555,6 +555,52 @@ git push
 
 ---
 
+---
+
+## Mente Compartilhada — CLI Mirror no Telegram (2026-05-14)
+
+Tornar o bot do Telegram **um clone funcional** do Hermes CLI, compartilhando skills, personalidade, MCPs, toolsets e configuração.
+
+### Configurações que o CLI tem e o Telegram padrão NÃO tem
+
+| Aspecto | CLI | Telegram (padrão) |
+|---------|:---:|:------------------:|
+| Toolsets | ~18 (terminal, file, web, delegation, cronjob...) | 1 (`hermes-telegram`) |
+| MCP Servers | 10 (obsidian, github, composio, youtube, etc.) | 0 |
+| Skills | 120+ | 0 |
+| Personalidades | kwai-bb, kawaii, etc. | só kawaii |
+| Memória | sim | só se configurada |
+| Terminal | sim | **não por padrão** |
+
+### O que precisa mudar
+
+1. **`config.yaml`** — adicionar `platform_toolsets.telegram`, `mcp_servers`, `agent.personalities`, `display.personality`, etc.
+2. **`Dockerfile`** — adicionar `COPY skills /opt/hermes/skills/` e instalar Node.js para MCPs via npx
+3. **`docker/entrypoint.sh`** — adicionar expansão de env vars (`os.path.expandvars()`) no config.yaml
+4. **`render.yaml`** — adicionar env vars `GITHUB_TOKEN` e `COMPOSIO_API_KEY` para MCPs
+
+### ⚠️ Pitfall: Skills com .git embedado viram submodule
+
+Skills em `~/.hermes/skills/` (ex: `obsidian-skills/`, `superpowers/`) podem ter `.git/` internos. Copiá-las com `cp -r` leva o `.git/` junto, e o git do projeto Render trata como **submodule**.
+
+```
+# NO CHECKOUT: git ls-tree HEAD mostra "160000 commit ..." em vez de "100644 blob ..."
+# SINTOMA: arquivos da skill não aparecem no repositório no GitHub
+```
+
+**Solução:** `find skills/PASTA -name ".git" -type d -prune -exec rm -rf {} +` após copiar.
+
+### 📄 Detalhes completos
+
+Veja `references/mente-compartilhada.md` para:
+- Config.yaml completo com todos os campos
+- Dockerfile com Node.js + skills
+- Entrypoint com expansão de env vars
+- Lista de MCPs que funcionam/não funcionam no Render
+- Comandos de correção do submodule pitfall
+
+---
+
 ## Troubleshooting
 
 | Problema | Causa | Solução |
