@@ -335,13 +335,14 @@ platform_toolsets:
     - clarify            # Perguntar pro usuário
     - messaging          # Mensagens
 
-# ── Composio (conexão com apps externos — só conectar, sem npx) ──
-composio:
-  api_key: ${COMPOSIO_API_KEY}
-
 # ── MCP Servers ────────────────────────────────────────────
 # Servidores que funcionam via npx (sem depender de path local)
 mcp_servers:
+  composio:
+    url: https://connect.composio.dev/mcp
+    headers:
+      x-consumer-api-key: ck_yZve8M-F5sAlKlG53Y-K
+    timeout: 120
   # ── YouTube transcript (único, mais estável) ──
   youtube-transcript:
     command: npx
