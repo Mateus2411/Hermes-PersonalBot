@@ -31,6 +31,19 @@ if [ "$(id -u)" = "0" ]; then
         chown hermes:hermes "$HERMES_HOME/config.yaml" 2>/dev/null || true
         chmod 640 "$HERMES_HOME/config.yaml" 2>/dev/null || true
     fi
+
+    # ─── Install Node.js for npx-based MCP servers (before dropping root) ──
+    # Precisamos de Node.js pra rodar servidores MCP que usam npx
+    # (youtube-transcript, github, rippr-mcp, context7)
+    echo "[node] Installing Node.js 20 LTS for npx MCP servers..."
+    if ! command -v node &>/dev/null; then
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null || true
+        apt-get install -y nodejs 2>/dev/null || echo "[node] Warning: apt install failed"
+        echo "[node] Node.js version: $(node --version 2>/dev/null || echo 'not installed')"
+    else
+        echo "[node] Node.js already installed: $(node --version)"
+    fi
+
     echo "Dropping root privileges"
     exec gosu hermes "$0" "$@"
 fi
@@ -63,63 +76,6 @@ with open(path, 'w') as f:
 " 2>/dev/null || true
     echo "[config] Environment variables expanded"
 fi
-# ─── Clean up MCP servers — remove tudo que precisa de Node.js/npx ────
-# No Render Free (512MB RAM) não tem Node.js instalado. Só mantemos
-# servidores URL-based (composio). Tudo que usa npx é removido.
-python3 -c "
-import yaml, os
-path = '$HERMES_HOME/config.yaml'
-with open(path) as f:
-    cfg = yaml.safe_load(f)
-mcp = cfg.get('mcp_servers', {})
-if not mcp:
-    exit(0)
-
-changed = False
-servers_to_remove = []
-
-for name, svc in mcp.items():
-    if not isinstance(svc, dict):
-        servers_to_remove.append(name)
-        changed = True
-        continue
-
-    cmd = svc.get('command', '')
-
-    # Remove servidores que usam npx/node — não temos Node.js no container
-    if cmd in ('npx', 'node'):
-        print(f'[mcp] Removing \"{name}\" — needs {cmd} (not installed)')
-        servers_to_remove.append(name)
-        changed = True
-        continue
-
-    # Remove servidores com paths locais (obsidian, filesystem, ig-download)
-    args = svc.get('args', [])
-    args_str = ' '.join(str(a) for a in args)
-    if any(p in args_str for p in ['/mnt/', '/home/', '/Users/']):
-        print(f'[mcp] Removing \"{name}\" — local path: {args_str[:60]}')
-        servers_to_remove.append(name)
-        changed = True
-        continue
-
-    # Composio: update API key from env var
-    url = svc.get('url', '')
-    if 'composio' in url and 'x-consumer-api-key' in svc.get('headers', {}):
-        ck = os.environ.get('COMPOSIO_API_KEY', '')
-        if ck:
-            svc['headers']['x-consumer-api-key'] = ck
-            print('[mcp] Updated composio API key from env')
-            changed = True
-
-for name in servers_to_remove:
-    del mcp[name]
-
-if changed:
-    cfg['mcp_servers'] = mcp or {}
-    with open(path, 'w') as f:
-        yaml.dump(cfg, f, default_flow_style=False)
-    print('[mcp] MCP config cleaned up')
-" 2>/dev/null || true
 
 if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
     cp "$INSTALL_DIR/docker/SOUL.md" "$HERMES_HOME/SOUL.md"

@@ -24,8 +24,8 @@ USER root
 
 # ─── Telegram dependency ──────────────────────────────────────────────
 # python-telegram-bot é necessário para o gateway do Telegram funcionar.
-# O Hermes instala num venv em /opt/hermes/.venv/ — por isso o path completo.
-RUN /opt/hermes/.venv/bin/pip install python-telegram-bot
+# Instala com pip do sistema (disponível globalmente na imagem oficial)
+RUN pip install python-telegram-bot
 
 # Copy the health server
 COPY render-health.py /opt/hermes/render-health.py

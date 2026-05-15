@@ -320,25 +320,13 @@ platform_toolsets:
 # ── MCP Servers ────────────────────────────────────────────
 # Servidores que funcionam via npx (sem depender de path local)
 mcp_servers:
+  # ── YouTube transcript (único, mais estável) ──
   youtube-transcript:
-    command: npx
-    args:
-      - '@fabriqa.ai/youtube-transcript-mcp@latest'
-  mcp-youtube:
-    command: npx
-    args:
-      - -y
-      - '@anaisbetts/mcp-youtube'
-  mcp-server-youtube-transcript:
     command: npx
     args:
       - -y
       - '@kimtaeyoon83/mcp-server-youtube-transcript'
-  context7:
-    command: npx
-    args:
-      - -y
-      - '@upstash/context7-mcp'
+  # ── GitHub ──
   github:
     command: npx
     args:
@@ -346,16 +334,18 @@ mcp_servers:
       - '@modelcontextprotocol/server-github'
     env:
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_TOKEN}
-  composio:
-    url: https://connect.composio.dev/mcp
-    headers:
-      x-consumer-api-key: ${COMPOSIO_API_KEY}
-    timeout: 120
+  # ── Rippr (transcrição YouTube alternativa) ──
   rippr-mcp:
     command: npx
     args:
       - -y
       - rippr-mcp
+  # ── Context7 (documentação técnica) ──
+  context7:
+    command: npx
+    args:
+      - -y
+      - '@upstash/context7-mcp'
 
 # ── Openrouter (desabilitado) ──────────────────────────────
 openrouter:
