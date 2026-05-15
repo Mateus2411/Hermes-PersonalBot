@@ -51,6 +51,15 @@ fi
 # --- Running as hermes from here ---
 source "${INSTALL_DIR}/.venv/bin/activate"
 
+# ─── Install python-telegram-bot (runtime, with venv active) ──────────
+# O build falha quando tentamos pip install — o path do venv varia entre
+# versões da imagem. Instalar AQUI (com venv ativado) é à prova de bala.
+python3 -c "import telegram" 2>/dev/null || {
+    echo "[telegram] python-telegram-bot not found — installing..."
+    pip install python-telegram-bot 2>&1 | sed 's/^/[telegram] /'
+    python3 -c "import telegram" 2>/dev/null && echo "[telegram] ✅ installed" || echo "[telegram] ❌ install failed"
+}
+
 # Create essential directories
 mkdir -p "$HERMES_HOME"/{cron,sessions,logs,hooks,memories,skills,skins,plans,workspace,home}
 
