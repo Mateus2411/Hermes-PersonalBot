@@ -44,11 +44,14 @@ echo "[health] Starting render-health.py on :${HEALTH_PORT}"
 python3 /opt/hermes/render-health.py &
 sleep 1
 
-# ─── Install python-telegram-bot (runtime, with venv active) ──────────
+# ─── Install python-telegram-bot in background (timeout-safe) ─────
 python3 -c "import telegram" 2>/dev/null || {
-    echo "[telegram] python-telegram-bot not found — installing..."
-    pip install python-telegram-bot 2>&1 | sed 's/^/[telegram] /'
-    python3 -c "import telegram" 2>/dev/null && echo "[telegram] ✅ installed" || echo "[telegram] ❌ install failed"
+    echo "[telegram] python-telegram-bot not found — installing in background..."
+    (
+        pip install python-telegram-bot 2>&1 | sed 's/^/[telegram] /'
+        python3 -c "import telegram" 2>/dev/null && echo "[telegram] ✅ installed" || echo "[telegram] ❌ install failed"
+    ) &
+    TELEGRAM_PID=$!
 }
 
 # Create essential directories
@@ -78,8 +81,6 @@ with open(path, 'w') as f:
 fi
 
 # ─── Clean up MCP servers — remover servidores que precisam de npx/node ──
-# No Render Free (512MB RAM) Node.js NÃO está instalado (USER hermes, não root).
-# Servidores MCP que usam npx ou caminhos locais são removidos aqui.
 python3 -c "
 import yaml, os
 path = '$HERMES_HOME/config.yaml'
@@ -97,32 +98,25 @@ for name, svc in mcp.items():
         servers_to_remove.append(name)
         changed = True
         continue
-
     cmd = svc.get('command', '')
-
-    # Remove npx/node — não instalados no container
     if cmd in ('npx', 'node'):
-        print(f'[mcp] Removing \"{name}\" — needs {cmd} (not available)')
+        print(f'[mcp] Removing \"{name}\" — needs {cmd}')
         servers_to_remove.append(name)
         changed = True
         continue
-
-    # Remove servidores com paths locais (obsidian, filesystem, ig-download)
     args = svc.get('args', [])
     args_str = ' '.join(str(a) for a in args) if isinstance(args, list) else ''
     if any(p in args_str for p in ['/mnt/', '/home/', '/Users/']):
-        print(f'[mcp] Removing \"{name}\" — local path: {args_str[:60]}')
+        print(f'[mcp] Removing \"{name}\" — local path')
         servers_to_remove.append(name)
         changed = True
         continue
-
-    # Composio: update API key from env var
     url = svc.get('url', '')
     if isinstance(url, str) and 'composio' in url and 'x-consumer-api-key' in svc.get('headers', {}):
         ck = os.environ.get('COMPOSIO_API_KEY', '')
         if ck:
             svc['headers']['x-consumer-api-key'] = ck
-            print('[mcp] Updated composio API key from env')
+            print('[mcp] Updated composio API key')
             changed = True
 
 for name in servers_to_remove:
@@ -132,7 +126,7 @@ if changed:
     cfg['mcp_servers'] = mcp or {}
     with open(path, 'w') as f:
         yaml.dump(cfg, f, default_flow_style=False)
-    print('[mcp] MCP config cleaned up')
+    print('[mcp] Cleaned up')
 " 2>/dev/null || true
 
 if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
@@ -169,4 +163,7 @@ esac
 if [ $# -gt 0 ] && command -v "$1" >/dev/null 2>&1; then
     exec "$@"
 fi
+
+# Reset set -e before starting gateway (don't crash on telegram install failure)
+set +e
 exec hermes "$@"
