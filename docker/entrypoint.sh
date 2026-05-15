@@ -1,5 +1,5 @@
 #!/bin/bash
-# Docker entrypoint for Render — runs health server + Hermes gateway.
+# Docker entrypoint for Render — starts Hermes gateway (health via gateway).
 set -e
 
 HERMES_HOME="${HERMES_HOME:-/opt/data}"
@@ -38,20 +38,15 @@ fi
 # --- Running as hermes from here ---
 source "${INSTALL_DIR}/.venv/bin/activate"
 
-# ─── Render Health Server (start FIRST so Render health check passes) ──
-HEALTH_PORT="${HEALTH_PORT:-10000}"
-echo "[health] Starting render-health.py on :${HEALTH_PORT}"
-python3 /opt/hermes/render-health.py &
-sleep 1
-
 # ─── Install python-telegram-bot in background (timeout-safe) ─────
 python3 -c "import telegram" 2>/dev/null || {
     echo "[telegram] python-telegram-bot not found — installing in background..."
     (
         pip install python-telegram-bot 2>&1 | sed 's/^/[telegram] /'
-        python3 -c "import telegram" 2>/dev/null && echo "[telegram] ✅ installed" || echo "[telegram] ❌ install failed"
+        python3 -c "import telegram" 2>/dev/null \
+            && echo "[telegram] ✅ installed" \
+            || echo "[telegram] ❌ install failed"
     ) &
-    TELEGRAM_PID=$!
 }
 
 # Create essential directories
@@ -62,10 +57,10 @@ if [ ! -f "$HERMES_HOME/.env" ]; then
     cp "$INSTALL_DIR/.env.example" "$HERMES_HOME/.env"
 fi
 
-# Always deploy our Render-optimized config.yaml (provider = opencode-zen only)
+# Always deploy our Render-optimized config.yaml
 if [ -f "$INSTALL_DIR/render-config.yaml" ]; then
     cp "$INSTALL_DIR/render-config.yaml" "$HERMES_HOME/config.yaml"
-    echo "[config] Applied render-config.yaml (opencode-zen only, no router)"
+    echo "[config] Applied render-config.yaml"
 
     # Expand env vars (${VAR}) in the config
     python3 -c "
@@ -77,55 +72,33 @@ content = os.path.expandvars(content)
 with open(path, 'w') as f:
     f.write(content)
 " 2>/dev/null || true
-    echo "[config] Environment variables expanded"
+    echo "[config] Env vars expanded"
 fi
 
-# ─── Clean up MCP servers — remover servidores que precisam de npx/node ──
+# ─── Clean up MCP servers — remove npx/node (not available on Render) ──
 python3 -c "
 import yaml, os
 path = '$HERMES_HOME/config.yaml'
 with open(path) as f:
     cfg = yaml.safe_load(f)
 mcp = cfg.get('mcp_servers', {})
-if not mcp:
-    exit(0)
-
-changed = False
-servers_to_remove = []
-
+if not mcp: exit(0)
+changed = False; to_remove = []
 for name, svc in mcp.items():
-    if not isinstance(svc, dict):
-        servers_to_remove.append(name)
-        changed = True
-        continue
+    if not isinstance(svc, dict): to_remove.append(name); changed = True; continue
     cmd = svc.get('command', '')
-    if cmd in ('npx', 'node'):
-        print(f'[mcp] Removing \"{name}\" — needs {cmd}')
-        servers_to_remove.append(name)
-        changed = True
-        continue
+    if cmd in ('npx', 'node'): to_remove.append(name); changed = True; continue
     args = svc.get('args', [])
     args_str = ' '.join(str(a) for a in args) if isinstance(args, list) else ''
-    if any(p in args_str for p in ['/mnt/', '/home/', '/Users/']):
-        print(f'[mcp] Removing \"{name}\" — local path')
-        servers_to_remove.append(name)
-        changed = True
-        continue
+    if any(p in args_str for p in ['/mnt/', '/home/', '/Users/']): to_remove.append(name); changed = True; continue
     url = svc.get('url', '')
     if isinstance(url, str) and 'composio' in url and 'x-consumer-api-key' in svc.get('headers', {}):
         ck = os.environ.get('COMPOSIO_API_KEY', '')
-        if ck:
-            svc['headers']['x-consumer-api-key'] = ck
-            print('[mcp] Updated composio API key')
-            changed = True
-
-for name in servers_to_remove:
-    del mcp[name]
-
+        if ck: svc['headers']['x-consumer-api-key'] = ck; print('[mcp] Updated composio key'); changed = True
+for name in to_remove: del mcp[name]
 if changed:
     cfg['mcp_servers'] = mcp or {}
-    with open(path, 'w') as f:
-        yaml.dump(cfg, f, default_flow_style=False)
+    with open(path, 'w') as f: yaml.dump(cfg, f)
     print('[mcp] Cleaned up')
 " 2>/dev/null || true
 
@@ -147,23 +120,13 @@ case "${HERMES_DASHBOARD:-}" in
     1|true|TRUE|True|yes|YES|Yes)
         dash_host="${HERMES_DASHBOARD_HOST:-0.0.0.0}"
         dash_port="${HERMES_DASHBOARD_PORT:-9119}"
-        dash_args=(--host "$dash_host" --port "$dash_port" --no-open)
-        if [ "$dash_host" != "127.0.0.1" ] && [ "$dash_host" != "localhost" ]; then
-            dash_args+=(--insecure)
-        fi
         echo "[dashboard] Starting Hermes dashboard on ${dash_host}:${dash_port}"
-        (
-            stdbuf -oL -eL hermes dashboard "${dash_args[@]}" 2>&1 \
-                | sed -u 's/^/[dashboard] /'
-        ) &
+        ( stdbuf -oL -eL hermes dashboard \
+            --host "$dash_host" --port "$dash_port" --no-open \
+            ${dash_host:+--insecure} 2>&1 | sed -u 's/^/[dashboard] /' ) &
         ;;
 esac
 
 # ─── Final exec ────────────────────────────────────────────────────
-if [ $# -gt 0 ] && command -v "$1" >/dev/null 2>&1; then
-    exec "$@"
-fi
-
-# Reset set -e before starting gateway (don't crash on telegram install failure)
 set +e
 exec hermes "$@"
